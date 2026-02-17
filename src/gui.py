@@ -64,7 +64,7 @@ TEXT_COLOR = (255, 255, 255)
 def get_color(char):
     """
     Mengambil warna dari map, handling kasus kalau hurufnya lowercase.
-    Jika di luar A-Z, kembalikan warna default (GRAY).
+    Jika di luar A-Z, kasih warna default (GRAY).
     """
     key = char.upper()
     if char in COLOR_MAP:
@@ -74,7 +74,7 @@ def get_color(char):
 class QueensGUI:
     def __init__(self):
         pygame.init()
-        self.screen = self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption("Queens LinkedIn Solver")
         
         # Font
@@ -87,7 +87,7 @@ class QueensGUI:
         self.N = 0
         self.filename = ""
 
-        # Variabel-variabel state terkini
+        # Variabel-variabel buat state solver
         self.current_solution = []
         self.iterations = 0
         self.is_solving = False
@@ -98,18 +98,29 @@ class QueensGUI:
         self.solver_thread = None
         self.stop_solver_flag = threading.Event()
 
-        # Layout kedua page
-        self.layout_welcome()
+        # Inisialisasi layout page menu dan solver
+        self.layout_menu()
         self.layout_solver()
 
-    # Layout halaman welcome
-    def layout_welcome(self):
-        center_x = WINDOW_WIDTH // 2
+        # Buat logo
+        self.logo_img = None
+        try:
+            raw_img = pygame.image.load(os.path.join("..", "doc", "crown.png"))
+            
+            # Ubah ukuran gambar supaya pas
+            self.logo_img = pygame.transform.scale(raw_img, (120, 120))
+            
+        except FileNotFoundError:
+            print("WARNING: File 'crown.png' tidak ditemukan. Logo tidak akan muncul.")
 
-        btn_w = 260
-        btn_h = 55
-        gap = 18
-        y = WINDOW_HEIGHT // 2 + 70
+    # Tombol di halaman menu
+    def layout_menu(self):
+        center_x = WINDOW_WIDTH // 2
+        y = WINDOW_HEIGHT // 2 + 120
+
+        btn_w = 320
+        btn_h = 60
+        gap = 20
 
         self.btn_load_txt = pygame.Rect(0, 0, btn_w, btn_h)
         self.btn_load_img = pygame.Rect(0, 0, btn_w, btn_h)
@@ -117,12 +128,12 @@ class QueensGUI:
         self.btn_load_txt.center = (center_x - (btn_w // 2 + gap // 2), y)
         self.btn_load_img.center = (center_x + (btn_w // 2 + gap // 2), y)
 
-    # Layout halaman solver
+    # Tombol di halaman solver
     def layout_solver(self):
         pad = 16
 
         # Tombol reset
-        self.btn_reset = pygame.Rect(pad, BOARD_H + pad, 140, 40)
+        self.btn_reset = pygame.Rect(WINDOW_WIDTH // 2 - 70, BOARD_H + pad, 140, 40)
 
         # Tombol save
         btn_w = 220
@@ -136,7 +147,7 @@ class QueensGUI:
         self.btn_save_txt = pygame.Rect(x0, y_btn, btn_w, btn_h)
         self.btn_save_img = pygame.Rect(x0 + btn_w + gap, y_btn, btn_w, btn_h)
 
-    # Layout papan supaya centered
+    # Layout papan supaya centered dengan menghitung (x, y) pojok kiri atas papan
     def board_origin(self):
         board_px = self.cell_size * self.N
         x0 = (BOARD_W - board_px) // 2
@@ -164,6 +175,10 @@ class QueensGUI:
             return
 
         try:
+            # Reset visual sebelum load baru
+            self.current_solution = []
+            self.found_solution = False
+
             # Load kalau input as text
             if input_type == 'txt':
                 self.grid, self.N = parser(path)
@@ -193,7 +208,7 @@ class QueensGUI:
         except Exception as e:
             print(f"Error load: {e}")
 
-    # Kembali ke halaman welcome
+    # Kembali ke halaman menu
     def reset_state(self):
         self.stop_solver_flag.set()
         self.is_solving = False
@@ -204,6 +219,7 @@ class QueensGUI:
         self.iterations = 0
         self.elapsed_time = 0
 
+    # Mulai solver
     def start_solver(self):
         self.stop_solver_flag.clear()
         self.is_solving = True
@@ -221,7 +237,7 @@ class QueensGUI:
 
     # Fungsi untuk menjalankan solver di thread
     def run_solver(self):
-        print("Solver dimulai di background thread...")
+        print("Solver dimulai di background...")
         final_sol, total_iter = solve_queens(self.grid, self.N, visualize_callback=self.update_visual, should_stop=self.stop_solver_flag.is_set)
         
         if self.stop_solver_flag.is_set():
@@ -244,27 +260,34 @@ class QueensGUI:
         mouse_pos = pygame.mouse.get_pos()
         color = BTN_HOVER_COLOR if rect.collidepoint(mouse_pos) else BTN_COLOR
         pygame.draw.rect(self.screen, color, rect, border_radius=12)
+        
         txt_surf = self.btn_font.render(text, True, TEXT_COLOR)
         txt_rect = txt_surf.get_rect(center=rect.center)
         self.screen.blit(txt_surf, txt_rect)
 
-    # Gambar welcome screen
-    def draw_welcome_screen(self):
+    # Gambar halaman menu
+    def draw_menu_screen(self):
         center_x = WINDOW_WIDTH // 2
 
-        # Judul + deskripsi
+        # Judul
         title = self.title_font.render("Queens LinkedIn Solver", True, BLACK)
         self.screen.blit(title, title.get_rect(center=(center_x, 120)))
 
-        desc1 = self.font.render("Selamat datang! Silakan input file yang mau diselesaikan.", True, (70, 70, 70))
-        self.screen.blit(desc1, desc1.get_rect(center=(center_x, 180)))
+        # Deskripsi
+        desc = self.font.render("Selamat datang! Silakan input file yang ingin diselesaikan.", True, (70, 70, 70))
+        self.screen.blit(desc, desc.get_rect(center=(center_x, 180)))
 
-        desc2 = self.font.render("Image yang diterima: PNG / JPG / JPEG", True, (110, 110, 110))
-        self.screen.blit(desc2, desc2.get_rect(center=(center_x, 212)))
+        # Logo
+        if self.logo_img:
+            logo_rect = self.logo_img.get_rect(center=(center_x, 300))
+            self.screen.blit(self.logo_img, logo_rect)
+        else:
+            text = self.font.render("[Logo Missing]", True, RED)
+            self.screen.blit(text, text.get_rect(center=(center_x, 300)))
 
-        # Tombol sejajar
+        # Tombol load
         self.draw_btn(self.btn_load_txt, "Load Text File (.txt)")
-        self.draw_btn(self.btn_load_img, "Load Image File")
+        self.draw_btn(self.btn_load_img, "Load Image File (JPEG/JPG/PNG)")
 
     # Gambar papan dengan kotak-kotak sesuai input
     def draw_board(self):
@@ -302,33 +325,31 @@ class QueensGUI:
 
     # Menampilkan informasi interasi dan waktu
     def draw_info(self):
-        # Update waktu kalau masih solving
-        if self.is_solving:
-            self.elapsed_time = (time.time() - self.start_time) * 1000
-            status_text = "Status: Mencari..."
-            status_color = RED
-        else:
-            if self.found_solution:
-                status_text = "Status: SELESAI"
-                status_color = GREEN
-            else:
-                status_text = "Status: GAGAL"
-                status_color = RED
-
-        # Posisi info: tepat di bawah papan
         x0, y0 = self.board_origin()
         board_px = self.cell_size * self.N
         info_y = y0 + board_px + 10
 
-        # Proses teks
-        text_status = self.font.render(status_text, True, status_color)
-        text_iter = self.font.render(f"Iterasi: {self.iterations}", True, BLACK)
-        text_time = self.font.render(f"Waktu: {self.elapsed_time:.0f} ms", True, BLACK)
+        if self.is_solving:
+            status_text = "Status: Mencari..."
+            color = RED
+        elif self.found_solution:
+            status_text = "Status: SELESAI"
+            color = GREEN
+        else:
+            status_text = "Status: GAGAL"
+            color = RED
 
         cx = WINDOW_WIDTH // 2
-        self.screen.blit(text_status, text_status.get_rect(center=(cx, info_y)))
-        self.screen.blit(text_iter, text_iter.get_rect(center=(cx - 140, info_y + 30)))
-        self.screen.blit(text_time, text_time.get_rect(center=(cx + 140, info_y + 30)))
+        # Status solver saat ini
+        txt_st = self.font.render(status_text, True, color)
+        self.screen.blit(txt_st, txt_st.get_rect(center=(cx, info_y)))
+        
+        # Tampilin banyak iterasi dan waktu
+        txt_iter = self.font.render(f"Iterasi: {self.iterations}", True, BLACK)
+        txt_time = self.font.render(f"Waktu: {self.elapsed_time:.0f} ms", True, BLACK)
+        
+        self.screen.blit(txt_iter, txt_iter.get_rect(center=(cx - 120, info_y + 30)))
+        self.screen.blit(txt_time, txt_time.get_rect(center=(cx + 120, info_y + 30)))
 
     # Tombol
     def draw_buttons(self):
@@ -338,11 +359,12 @@ class QueensGUI:
         # Save cuma muncul kalau selesai dan ada solusi
         if self.found_solution:
             self.draw_btn(self.btn_save_txt, "Save TXT")
-            self.draw_btn(self.btn_save_img, "Save PNG")
+            self.draw_btn(self.btn_save_img, "Save IMG")
 
     # Loop utama selama GUI dijalankan
     def run(self):
         running = True
+        
         while running:
             mouse_pos = pygame.mouse.get_pos()
 
@@ -355,7 +377,7 @@ class QueensGUI:
 
                 # Cek ada mouse click atau ngga
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    # Ketika di halaman welcome
+                    # Ketika di halaman menu
                     if self.grid is None:
                         if self.btn_load_txt.collidepoint(mouse_pos):
                             self.load_input('txt')
@@ -379,7 +401,7 @@ class QueensGUI:
                                 board_px = self.cell_size * self.N
                                 sub = self.screen.subsurface((x0, y0, board_px, board_px))
                                 pygame.image.save(sub, fname)
-                                print(f"Saved PNG: {fname}")
+                                print(f"Saved IMG: {fname}")
                             
                             # Simpan sebagai text
                             elif self.btn_save_txt.collidepoint(mouse_pos):
@@ -394,7 +416,7 @@ class QueensGUI:
             
             # Switch tampilan berdasarkan status Grid
             if self.grid is None:
-                self.draw_welcome_screen()
+                self.draw_menu_screen()
             else:
                 self.draw_board()
                 self.draw_queens()

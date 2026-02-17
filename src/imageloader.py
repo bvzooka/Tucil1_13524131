@@ -1,22 +1,21 @@
-from PIL import Image
 import numpy as np
 import math
 
-# GUI kamu punya A-Z (26). Kita pakai itu sebagai label output.
+from PIL import Image
+
+# Banyak warna ada 26, ngikutin alfabet
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-# Threshold buat ngelompokkan warna yang "mirip"
-# Kalau gambar input banyak noise JPG, naikin dikit (misal 40-55).
-COLOR_MERGE_THR = 45
+# Batas kemiripan warna dianggap satu warna
+# Dibuat kecil supaya warna yang shadenya beda tipis aja dianggap beda
+COLOR_MERGE_THR = 25
 
-
+# Buat ngitung jarak euclidean antara dua warna di gambar input
 def rgb_dist(a, b):
-    """Jarak Euclidean RGB."""
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2)
 
-
+# Kalau ada garis tebal atau garis yang berdekatan, gabungin
 def _merge_positions(pos, merge_gap=3):
-    """Gabungkan posisi garis yang berdekatan (garis tebal bisa ke-detect berkali-kali)."""
     if len(pos) == 0:
         return []
 
@@ -31,26 +30,24 @@ def _merge_positions(pos, merge_gap=3):
     merged = [int(sum(g) / len(g)) for g in groups]
     return merged
 
-def pick_best_periodic_lines(lines, target_count=None):
-    """
-    Ambil subset garis yang paling konsisten jaraknya (grid periodik).
-    Kalau target_count dikasih (misal 10), dia akan cari sekuens panjang itu.
-    """
+# Filter garis grid supaya jaraknya konsisten
+def pick_best_periodic_lines(lines):
     lines = sorted(lines)
     if len(lines) < 4:
         return lines
 
-    # hitung semua jarak antar tetangga
+    # Hitung semua jarak antar tetangga (cari mediannya)
     diffs = [lines[i+1] - lines[i] for i in range(len(lines)-1)]
     step = int(np.median(diffs)) if len(diffs) else 0
     if step <= 0:
         return lines
 
-    # toleransi (gridline bisa geser beberapa px)
+    # Toleransi
     tol = max(2, int(step * 0.35))
 
     best = []
-    # coba mulai dari tiap index, bangun sekuens yang mengikuti step
+
+    # Cari sequence terpanjang yang memenuhi si step di atas
     for start in range(len(lines)):
         seq = [lines[start]]
         last = lines[start]
@@ -61,29 +58,13 @@ def pick_best_periodic_lines(lines, target_count=None):
         if len(seq) > len(best):
             best = seq
 
-    # kalau user/board biasanya butuh count tertentu (N+1), potong/ambil yang paling pas
-    if target_count is not None and len(best) >= target_count:
-        # pilih window ukuran target_count yang paling konsisten
-        best_window = best[:target_count]
-        best_score = float("inf")
-        for i in range(0, len(best) - target_count + 1):
-            window = best[i:i+target_count]
-            wd = [window[k+1] - window[k] for k in range(len(window)-1)]
-            score = np.std(wd)  # makin kecil makin bagus
-            if score < best_score:
-                best_score = score
-                best_window = window
-        return best_window
+    if len(best) >= 2:
+        return best
+    else:
+        lines
 
-    return best
-
-
-
+# Buang frame/border hitam tebal supaya lebih gampang deteksi grid
 def crop_inner_board(img_arr):
-    """
-    Buang frame/border hitam tebal (rounded) supaya deteksi grid stabil.
-    Cocok untuk output board seperti yang kamu kirim.
-    """
     dark = (img_arr[:, :, 0] < 80) & (img_arr[:, :, 1] < 80) & (img_arr[:, :, 2] < 80)
     h, w = dark.shape
 
@@ -112,23 +93,19 @@ def crop_inner_board(img_arr):
     r_bot = min(h - 1, r_bot + pad)
     c_right = min(w - 1, c_right + pad)
 
+    # Validasi crop jangan sampai habis
     if r_bot - r_top < h * 0.5 or c_right - c_left < w * 0.5:
         return img_arr
 
     return img_arr[r_top:r_bot+1, c_left:c_right+1, :]
 
-
+# Ngedeteksi garis grid horizontal dan vertikal
 def detect_grid_lines(img_arr):
-    """
-    Robust gridline detection:
-    - coba beberapa threshold gelap (buat JPEG / garis abu2)
-    - coba beberapa threshold panjang garis (buat garis tipis)
-    """
     h, w, _ = img_arr.shape
 
-    # beberapa kandidat threshold gelap (makin besar = makin sensitif)
+    # Threshold gelap
     dark_thrs = [120, 140, 170, 200]
-    # beberapa kandidat ratio minimal panjang garis
+    # Ratio minimal panjang garis
     ratios = [0.08, 0.06, 0.04, 0.025]
 
     best_xs, best_ys = [], []
@@ -149,15 +126,14 @@ def detect_grid_lines(img_arr):
             xs = _merge_positions(x_candidates, merge_gap=max(2, w // 300))
             ys = _merge_positions(y_candidates, merge_gap=max(2, h // 300))
 
-            # minimal harus ada beberapa garis
+            # Minimal harus ada beberapa garis
             if len(xs) < 4 or len(ys) < 4:
                 continue
 
-            # jangan hardcode 10 di sini — biarkan adaptif untuk N berapa pun
-            xs2 = pick_best_periodic_lines(xs, target_count=None)
-            ys2 = pick_best_periodic_lines(ys, target_count=None)
+            xs2 = pick_best_periodic_lines(xs)
+            ys2 = pick_best_periodic_lines(ys)
 
-            # scoring: lebih baik yang lebih banyak & seimbang
+            # Maksimalin jumlah garis yang banyak dan seimbang
             score = min(len(xs2), len(ys2)) * 10 - abs(len(xs2) - len(ys2)) * 3
 
             best_score = min(len(best_xs), len(best_ys)) * 10 - abs(len(best_xs) - len(best_ys)) * 3
@@ -166,13 +142,9 @@ def detect_grid_lines(img_arr):
 
     return best_xs, best_ys
 
-
-
+# Ambil warna rata-rata cell
 def sample_cell_color(img_arr, x1, x2, y1, y2):
-    """
-    Ambil warna sel via median patch tengah,
-    buang pixel gelap (gridline/crown) + buang putih ekstrem (highlight).
-    """
+    # Ambil area tengah
     cx1 = int(x1 + (x2 - x1) * 0.35)
     cx2 = int(x1 + (x2 - x1) * 0.65)
     cy1 = int(y1 + (y2 - y1) * 0.35)
@@ -182,32 +154,27 @@ def sample_cell_color(img_arr, x1, x2, y1, y2):
     if patch.size == 0:
         return (200, 200, 200)
 
-    # buang dark
+    # Buang noise gelap
     keep = ~((patch[:, 0] < 80) & (patch[:, 1] < 80) & (patch[:, 2] < 80))
     patch2 = patch[keep]
 
-    # buang putih ekstrem
+    # Buang putih ekstrem
     if len(patch2) > 0:
         keep2 = ~((patch2[:, 0] > 245) & (patch2[:, 1] > 245) & (patch2[:, 2] > 245))
         patch2 = patch2[keep2]
 
     if len(patch2) < 10:
-        patch2 = patch  # fallback
+        patch2 = patch
 
     med = np.median(patch2, axis=0)
     return (int(med[0]), int(med[1]), int(med[2]))
 
-
+# Kelompokin warna, yang unik bikin cluster baru
 def cluster_colors(colors, merge_thr=COLOR_MERGE_THR, max_clusters=26):
-    """
-    Cluster sederhana:
-    - assign warna ke cluster terdekat jika jarak < merge_thr
-    - kalau lebih dari 26, merge cluster terdekat sampai 26
-    Return: list of clusters (centroid, members_count)
-    """
-    clusters = []  # each: {"centroid": (r,g,b), "count": int, "first_idx": int}
+    clusters = []
 
     for idx, rgb in enumerate(colors):
+        # Coba masukin ke cluster yang udah ada
         best_i = -1
         best_d = float("inf")
 
@@ -219,7 +186,7 @@ def cluster_colors(colors, merge_thr=COLOR_MERGE_THR, max_clusters=26):
 
         if best_i != -1 and best_d <= merge_thr:
             cl = clusters[best_i]
-            # update centroid by running average (biar stabil)
+            # Update centroid cluster yang udah ada
             c = cl["count"]
             cr, cg, cb = cl["centroid"]
             nr = int((cr * c + rgb[0]) / (c + 1))
@@ -228,45 +195,53 @@ def cluster_colors(colors, merge_thr=COLOR_MERGE_THR, max_clusters=26):
             cl["centroid"] = (nr, ng, nb)
             cl["count"] += 1
         else:
+            # Buat cluster baru
             clusters.append({"centroid": rgb, "count": 1, "first_idx": idx})
 
-    # kalau cluster kebanyakan, merge yang paling dekat
-    while len(clusters) > max_clusters:
+    # Kalau cluster kebanyakan, merge yang paling dekat
+    while True:
+        if len(clusters) <= max_clusters:
+            # Cek apakah masih ada yang jaraknya sangat dekat walau jumlah cluster udah dikit
+            pass 
+        
         best_pair = None
-        best_d = float("inf")
+        min_dist = float("inf")
 
+        # Cari pasangan terdekat
         for i in range(len(clusters)):
             for j in range(i + 1, len(clusters)):
                 d = rgb_dist(clusters[i]["centroid"], clusters[j]["centroid"])
-                if d < best_d:
-                    best_d = d
+                if d < min_dist:
+                    min_dist = d
                     best_pair = (i, j)
+        
+        # Stop jika tidak ada yang perlu di-merge (jarak jauh semua) atau udah cukup
+        if best_pair is None or (len(clusters) <= max_clusters and min_dist > merge_thr):
+            break
 
+        # Merge
         i, j = best_pair
-        a = clusters[i]
-        b = clusters[j]
-
-        # merge b into a (weighted)
-        ca, cb = a["count"], b["count"]
-        ar, ag, ab_ = a["centroid"]
-        br, bg, bb_ = b["centroid"]
-        nr = int((ar * ca + br * cb) / (ca + cb))
-        ng = int((ag * ca + bg * cb) / (ca + cb))
-        nb = int((ab_ * ca + bb_ * cb) / (ca + cb))
-
-        a["centroid"] = (nr, ng, nb)
-        a["count"] = ca + cb
-        a["first_idx"] = min(a["first_idx"], b["first_idx"])
-
+        c1, c2 = clusters[i], clusters[j]
+        
+        total_count = c1["count"] + c2["count"]
+        new_centroid = []
+        for k in range(3):
+            val = (c1["centroid"][k] * c1["count"] + c2["centroid"][k] * c2["count"]) / total_count
+            new_centroid.append(int(val))
+            
+        c1["centroid"] = tuple(new_centroid)
+        c1["count"] = total_count
+        c1["first_idx"] = min(c1["first_idx"], c2["first_idx"])
+        
+        # Hapus cluster j
         clusters.pop(j)
 
-    # sort cluster by first appearance (deterministic)
+    # Sort based on kemunculan pertama supaya urutan huruf konsisten
     clusters.sort(key=lambda x: x["first_idx"])
     return clusters
 
-
+# Cari kelompok warna terdekat buat return hurufnya
 def assign_letter(rgb, clusters):
-    """Cari cluster terdekat, balikin hurufnya."""
     best_i = 0
     best_d = float("inf")
     for i, cl in enumerate(clusters):
@@ -276,17 +251,17 @@ def assign_letter(rgb, clusters):
             best_i = i
     return LETTERS[best_i] if best_i < len(LETTERS) else "Z"
 
-
 def process_image(filepath):
     try:
         img = Image.open(filepath).convert("RGB")
         img_arr0 = np.array(img)
         img_arr1 = crop_inner_board(img_arr0)
 
+        # Coba deteksi grid di gambar asli banding gambar crop
         xs0, ys0 = detect_grid_lines(img_arr0)
         xs1, ys1 = detect_grid_lines(img_arr1)
 
-        # pilih yang lebih banyak & seimbang
+        # Pilih yang paling "kotak" (N X N)
         def score(xs, ys):
             return min(len(xs), len(ys)) * 10 - abs(len(xs) - len(ys)) * 3
 
@@ -301,9 +276,9 @@ def process_image(filepath):
         print("Detected lines:", len(xs), len(ys), "=> N =", min(len(xs), len(ys)) - 1)
 
         if N <= 0:
-            return None, 0
+            return (None, 0)
 
-        # --- 1) SAMPLE warna semua sel ---
+        # Sampling warna semua cell
         cell_colors = []
         for r in range(N):
             y1, y2 = ys[r], ys[r + 1]
@@ -312,11 +287,10 @@ def process_image(filepath):
                 rgb = sample_cell_color(img_arr, x1, x2, y1, y2)
                 cell_colors.append(rgb)
 
-        # --- 2) CLUSTER warna -> huruf ---
+        # Pengelompokan warna-warna
         clusters = cluster_colors(cell_colors, merge_thr=COLOR_MERGE_THR, max_clusters=26)
-        # print("Clusters:", len(clusters))  # debug kalau mau
 
-        # --- 3) BUILD grid huruf ---
+        # Ubah jadi huruf
         grid = []
         idx = 0
         for r in range(N):
@@ -327,8 +301,8 @@ def process_image(filepath):
                 idx += 1
             grid.append(row_chars)
 
-        return grid, N
+        return (grid, N)
 
     except Exception as e:
         print(f"Error processing image: {e}")
-        return None, 0
+        return (None, 0)
