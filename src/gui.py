@@ -330,6 +330,7 @@ class QueensGUI:
         info_y = y0 + board_px + 10
 
         if self.is_solving:
+            self.elapsed_time = (time.time() - self.start_time) * 1000
             status_text = "Status: Mencari..."
             color = RED
         elif self.found_solution:

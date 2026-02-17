@@ -66,7 +66,7 @@ def solve_queens(grid, N, visualize_callback=None, should_stop=None):
             iterations += 1
             
             # Visualisasi setiap 100.000 iterasi
-            if visualize_callback and iterations % 10000 == 0:
+            if visualize_callback and iterations % 100000 == 0:
                  # Konversi dari list ke tuples [(r, c)] untuk koordinat
                  temp_sol = [(r, current_placement[r]) for r in range(N)]
                  visualize_callback(temp_sol, iterations)
