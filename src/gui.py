@@ -3,14 +3,20 @@ import threading
 import time
 import sys
 import os
+import tkinter as tk
 
 from parser import parser, save_solution
 from solver import solve_queens
+from tkinter import filedialog
+from imageloader import process_image
 
 # Konfigurasi layar
-SCREEN_SIZE = 600
+BOARD_W = 900
+BOARD_H = 560
+BOTTOM_H = 150
+WINDOW_WIDTH = BOARD_W
+WINDOW_HEIGHT = BOARD_H + BOTTOM_H
 GRID_OFFSET = 50
-FONT_SIZE = 30
 
 # Daftar warna
 WHITE = (255, 255, 255)
@@ -22,38 +28,38 @@ GREEN = (50, 200, 50)
 
 # Mapping karakter warna ke RGB
 COLOR_MAP = {
-    'A': (255, 100, 100), # Merah Muda (Light Red)
-    'B': (100, 255, 100), # Hijau Muda (Light Green)
-    'C': (100, 100, 255), # Biru Muda (Light Blue)
-    'D': (255, 255, 100), # Kuning Cerah (Yellow)
-    'E': (255, 100, 255), # Magenta/Ungu Terang
-    'F': (100, 255, 255), # Cyan/Biru Langit
-    'G': (255, 150, 50),  # Oranye (Orange)
-    'H': (150, 100, 50),  # Coklat Tanah (Brown)
-    'I': (128, 128, 128), # Abu-abu Medium (Grey)
-    'J': (47, 79, 79),    # Dark Slate Gray (Abu Kehijauan Gelap)
-    'K': (255, 215, 0),   # Kuning Emas (Gold)
-    'L': (255, 140, 0),   # Oranye Gelap (Dark Orange)
-    'M': (139, 69, 19),   # Coklat Kayu (Saddle Brown)
-    'N': (50, 205, 50),   # Hijau Stabilo (Lime Green)
-    'O': (0, 0, 128),     # Biru Dongker (Navy)
-    'P': (0, 128, 128),   # Teal (Hijau Kebiruan)
-    'Q': (128, 0, 0),     # Merah Hati (Maroon)
-    'R': (255, 20, 147),  # Deep Pink (Merah Jambu Tua)
-    'S': (128, 128, 0),   # Olive (Kuning Zaitun)
-    'T': (147, 112, 219), # Medium Purple (Ungu Medium)
-    'U': (210, 180, 140), # Tan (Coklat Muda/Krem)
-    'V': (255, 127, 80),  # Coral (Merah Bata Muda)
-    'W': (46, 139, 87),   # Sea Green (Hijau Laut)
-    'X': (75, 0, 130),    # Indigo (Nila Gelap)
-    'Y': (220, 20, 60),   # Crimson (Merah Darah)
-    'Z': (70, 130, 180)   # Steel Blue (Biru Baja - sama kayak tombol)
+    'A': (255, 100, 100),
+    'B': (100, 255, 100),
+    'C': (100, 100, 255),
+    'D': (255, 255, 100),
+    'E': (255, 100, 255),
+    'F': (100, 255, 255),
+    'G': (255, 150, 50),
+    'H': (150, 100, 50),
+    'I': (128, 128, 128),
+    'J': (47, 79, 79),
+    'K': (255, 215, 0),
+    'L': (255, 140, 0),
+    'M': (139, 69, 19),
+    'N': (50, 205, 50),
+    'O': (0, 0, 128),
+    'P': (0, 128, 128),
+    'Q': (128, 0, 0),
+    'R': (255, 20, 147),
+    'S': (128, 128, 0),
+    'T': (147, 112, 219),
+    'U': (210, 180, 140),
+    'V': (255, 127, 80), 
+    'W': (46, 139, 87),
+    'X': (75, 0, 130),
+    'Y': (220, 20, 60),
+    'Z': (70, 130, 180)
 }
 
 # Warna Tombol
-BTN_COLOR = (70, 130, 180)       # Steel Blue
-BTN_HOVER_COLOR = (100, 149, 237) # Cornflower Blue (lebih terang pas di-hover)
-TEXT_COLOR = (255, 255, 255)     # Putih
+BTN_COLOR = (70, 130, 180)
+BTN_HOVER_COLOR = (100, 149, 237)
+TEXT_COLOR = (255, 255, 255)
 
 def get_color(char):
     """
@@ -66,40 +72,147 @@ def get_color(char):
     return GRAY
 
 class QueensGUI:
-    def __init__(self, filename):
+    def __init__(self):
         pygame.init()
-        self.screen_height = SCREEN_SIZE + 150 
-        self.screen = pygame.display.set_mode((SCREEN_SIZE, self.screen_height))
+        self.screen = self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption("Queens LinkedIn Solver")
+        
+        # Font
+        self.title_font = pygame.font.SysFont('Arial', 40, bold=True)
         self.font = pygame.font.SysFont('Arial', 24)
         self.btn_font = pygame.font.SysFont('Arial', 20, bold=True)
         
-        # Load data
-        self.grid, self.N = parser(filename)
-        if not self.grid:
-            print("Gagal membaca file!")
-            sys.exit()
-
-        # Hitung ukuran kotak
-        self.cell_size = (SCREEN_SIZE - 2 * GRID_OFFSET) // self.N
+        # State variables
+        self.grid = None
+        self.N = 0
+        self.filename = ""
 
         # Variabel-variabel state terkini
         self.current_solution = []
         self.iterations = 0
-        self.is_solving = True
-        self.start_time = time.time()
-        self.elapsed_time = 0
+        self.is_solving = False
         self.found_solution = False
+        self.start_time = 0
+        self.elapsed_time = 0
+        self.cell_size = 0
+        self.solver_thread = None
+        self.stop_solver_flag = threading.Event()
 
-        # Multithreading buat solver dan GUI berjalan di thread terpisah
+        # Layout kedua page
+        self.layout_welcome()
+        self.layout_solver()
+
+    # Layout halaman welcome
+    def layout_welcome(self):
+        center_x = WINDOW_WIDTH // 2
+
+        btn_w = 260
+        btn_h = 55
+        gap = 18
+        y = WINDOW_HEIGHT // 2 + 70
+
+        self.btn_load_txt = pygame.Rect(0, 0, btn_w, btn_h)
+        self.btn_load_img = pygame.Rect(0, 0, btn_w, btn_h)
+
+        self.btn_load_txt.center = (center_x - (btn_w // 2 + gap // 2), y)
+        self.btn_load_img.center = (center_x + (btn_w // 2 + gap // 2), y)
+
+    # Layout halaman solver
+    def layout_solver(self):
+        pad = 16
+
+        # Tombol reset
+        self.btn_reset = pygame.Rect(pad, BOARD_H + pad, 140, 40)
+
+        # Tombol save
+        btn_w = 220
+        btn_h = 46
+        gap = 16
+        y_btn = BOARD_H + BOTTOM_H - pad - btn_h
+
+        total_w = btn_w * 2 + gap
+        x0 = (WINDOW_WIDTH - total_w) // 2
+
+        self.btn_save_txt = pygame.Rect(x0, y_btn, btn_w, btn_h)
+        self.btn_save_img = pygame.Rect(x0 + btn_w + gap, y_btn, btn_w, btn_h)
+
+    # Layout papan supaya centered
+    def board_origin(self):
+        board_px = self.cell_size * self.N
+        x0 = (BOARD_W - board_px) // 2
+        y0 = (BOARD_H - board_px) // 2
+        return x0, y0
+
+    # Load file
+    def open_file_dialog(self, file_type):
+        root = tk.Tk()
+        root.withdraw()
+        
+        if file_type == 'txt':
+            filetypes = [("Text Files", "*.txt")]
+        else:
+            filetypes = [("Images", "*.png;*.jpg;*.jpeg")]
+
+        path = filedialog.askopenfilename(filetypes=filetypes)
+        root.destroy()
+        return path
+
+    # Ketika tombol load ditekan
+    def load_input(self, input_type):
+        path = self.open_file_dialog(input_type)
+        if not path: 
+            return
+
+        try:
+            # Load kalau input as text
+            if input_type == 'txt':
+                self.grid, self.N = parser(path)
+                
+            # Load kalau input image
+            elif input_type == 'img':
+                print(f"Loading Image dari: {path}")
+   
+                self.grid, self.N = process_image(path)
+
+                if not self.grid:
+                    print("Gagal mendeteksi grid dari gambar!")
+                    return
+
+            # Kalau berhasil load
+            if self.grid and self.N > 0:
+                self.filename = os.path.basename(path)
+
+                # Hitung cell_size berdasarkan area board
+                usable = min(BOARD_W, BOARD_H) - 2 * GRID_OFFSET
+                self.cell_size = usable // self.N
+
+                self.start_solver()
+            else:
+                print("Gagal load file.")
+
+        except Exception as e:
+            print(f"Error load: {e}")
+
+    # Kembali ke halaman welcome
+    def reset_state(self):
+        self.stop_solver_flag.set()
+        self.is_solving = False
+        self.grid = None
+        self.N = 0
+        self.current_solution = []
+        self.found_solution = False
+        self.iterations = 0
+        self.elapsed_time = 0
+
+    def start_solver(self):
+        self.stop_solver_flag.clear()
+        self.is_solving = True
+        self.found_solution = False
+        self.iterations = 0
+        self.start_time = time.time()
         self.solver_thread = threading.Thread(target=self.run_solver)
         self.solver_thread.daemon = True
         self.solver_thread.start()
-
-        # Konfigurasi tombol (x, y, lebar, tinggi)
-        button_y = SCREEN_SIZE + 80
-        self.btn_save_img = pygame.Rect(50, button_y, 200, 40)
-        self.btn_save_txt = pygame.Rect(300, button_y, 200, 40)
 
     # Konektor antara solver.py dengan gui.py
     def update_visual(self, solution, iterations):
@@ -109,10 +222,16 @@ class QueensGUI:
     # Fungsi untuk menjalankan solver di thread
     def run_solver(self):
         print("Solver dimulai di background thread...")
-        final_sol, total_iter = solve_queens(self.grid, self.N, visualize_callback=self.update_visual)
+        final_sol, total_iter = solve_queens(self.grid, self.N, visualize_callback=self.update_visual, should_stop=self.stop_solver_flag.is_set)
         
+        if self.stop_solver_flag.is_set():
+            print("Solver dihentikan. Kembali ke menu utama.")
+            return
+
         self.is_solving = False
         self.iterations = total_iter
+        self.elapsed_time = (time.time() - self.start_time) * 1000
+        
         if final_sol:
             self.current_solution = final_sol
             self.found_solution = True
@@ -120,34 +239,65 @@ class QueensGUI:
         else:
             print("Tidak ada solusi.")
 
+    # Helper gambar tombol
+    def draw_btn(self, rect, text):
+        mouse_pos = pygame.mouse.get_pos()
+        color = BTN_HOVER_COLOR if rect.collidepoint(mouse_pos) else BTN_COLOR
+        pygame.draw.rect(self.screen, color, rect, border_radius=12)
+        txt_surf = self.btn_font.render(text, True, TEXT_COLOR)
+        txt_rect = txt_surf.get_rect(center=rect.center)
+        self.screen.blit(txt_surf, txt_rect)
+
+    # Gambar welcome screen
+    def draw_welcome_screen(self):
+        center_x = WINDOW_WIDTH // 2
+
+        # Judul + deskripsi
+        title = self.title_font.render("Queens LinkedIn Solver", True, BLACK)
+        self.screen.blit(title, title.get_rect(center=(center_x, 120)))
+
+        desc1 = self.font.render("Selamat datang! Silakan input file yang mau diselesaikan.", True, (70, 70, 70))
+        self.screen.blit(desc1, desc1.get_rect(center=(center_x, 180)))
+
+        desc2 = self.font.render("Image yang diterima: PNG / JPG / JPEG", True, (110, 110, 110))
+        self.screen.blit(desc2, desc2.get_rect(center=(center_x, 212)))
+
+        # Tombol sejajar
+        self.draw_btn(self.btn_load_txt, "Load Text File (.txt)")
+        self.draw_btn(self.btn_load_img, "Load Image File")
+
     # Gambar papan dengan kotak-kotak sesuai input
     def draw_board(self):
+        x0, y0 = self.board_origin()
+
         for r in range(self.N):
             for c in range(self.N):
                 color_char = self.grid[r][c]
                 color = get_color(color_char)
-                
+
                 # Koordinat layar
-                x = GRID_OFFSET + c * self.cell_size
-                y = GRID_OFFSET + r * self.cell_size
-                
+                x = x0 + c * self.cell_size
+                y = y0 + r * self.cell_size
+
                 # Gambar kotak
                 pygame.draw.rect(self.screen, color, (x, y, self.cell_size, self.cell_size))
                 # Gambar garis pinggir kotak
                 pygame.draw.rect(self.screen, BLACK, (x, y, self.cell_size, self.cell_size), 1)
-
+    
     # Menggambar Queen di papan (bentuk lingkaran)
     def draw_queens(self):
         # Copy supaya tidak error ketika sedang update thread
-        queens = list(self.current_solution) 
-        
+        queens = list(self.current_solution)
+
+        x0, y0 = self.board_origin()
+
         for r, c in queens:
-            x = GRID_OFFSET + c * self.cell_size + self.cell_size // 2
-            y = GRID_OFFSET + r * self.cell_size + self.cell_size // 2
+            x = x0 + c * self.cell_size + self.cell_size // 2
+            y = y0 + r * self.cell_size + self.cell_size // 2
             radius = self.cell_size // 3
-            
+
             # Gambar lingkaran Queen
-            pygame.draw.circle(self.screen, BLACK, (x, y), radius) # outline
+            pygame.draw.circle(self.screen, BLACK, (x, y), radius)  # outline
             pygame.draw.circle(self.screen, WHITE, (x, y), radius - 2)
 
     # Menampilkan informasi interasi dan waktu
@@ -156,96 +306,100 @@ class QueensGUI:
         if self.is_solving:
             self.elapsed_time = (time.time() - self.start_time) * 1000
             status_text = "Status: Mencari..."
+            status_color = RED
         else:
-            status_text = "Status: SELESAI" if self.found_solution else "Status: GAGAL"
+            if self.found_solution:
+                status_text = "Status: SELESAI"
+                status_color = GREEN
+            else:
+                status_text = "Status: GAGAL"
+                status_color = RED
+
+        # Posisi info: tepat di bawah papan
+        x0, y0 = self.board_origin()
+        board_px = self.cell_size * self.N
+        info_y = y0 + board_px + 10
 
         # Proses teks
+        text_status = self.font.render(status_text, True, status_color)
         text_iter = self.font.render(f"Iterasi: {self.iterations}", True, BLACK)
         text_time = self.font.render(f"Waktu: {self.elapsed_time:.0f} ms", True, BLACK)
-        text_status = self.font.render(status_text, True, RED if not self.found_solution else GREEN)
 
-        # Taruh di layar bagian bawah
-        base_y = SCREEN_SIZE + 10
-        self.screen.blit(text_status, (20, base_y))
-        self.screen.blit(text_iter, (20, base_y + 30))
-        self.screen.blit(text_time, (300, base_y + 30))
+        cx = WINDOW_WIDTH // 2
+        self.screen.blit(text_status, text_status.get_rect(center=(cx, info_y)))
+        self.screen.blit(text_iter, text_iter.get_rect(center=(cx - 140, info_y + 30)))
+        self.screen.blit(text_time, text_time.get_rect(center=(cx + 140, info_y + 30)))
 
     # Tombol
     def draw_buttons(self):
-        mouse_pos = pygame.mouse.get_pos()
-        
-        # Tombol save gambar
-        # Cek apakah mouse lagi di atas tombol
-        if self.btn_save_img.collidepoint(mouse_pos):
-            color_img = BTN_HOVER_COLOR
-        else:
-            color_img = BTN_COLOR
-            
-        pygame.draw.rect(self.screen, color_img, self.btn_save_img, border_radius=10)
-        
-        # Teks pada tombol
-        text_img = self.btn_font.render("Simpan Gambar (PNG)", True, TEXT_COLOR)
-        # Supaya teks centered di dalam tombol
-        text_rect_img = text_img.get_rect(center=self.btn_save_img.center)
-        self.screen.blit(text_img, text_rect_img)
+        # Reset selalu muncul
+        self.draw_btn(self.btn_reset, "Menu Awal")
 
-        # Tombol save text
-        if self.btn_save_txt.collidepoint(mouse_pos):
-            color_txt = BTN_HOVER_COLOR
-        else:
-            color_txt = BTN_COLOR
-            
-        pygame.draw.rect(self.screen, color_txt, self.btn_save_txt, border_radius=10)
-        
-        text_txt = self.btn_font.render("Simpan Text (.txt)", True, TEXT_COLOR)
-        text_rect_txt = text_txt.get_rect(center=self.btn_save_txt.center)
-        self.screen.blit(text_txt, text_rect_txt)
+        # Save cuma muncul kalau selesai dan ada solusi
+        if self.found_solution:
+            self.draw_btn(self.btn_save_txt, "Save TXT")
+            self.draw_btn(self.btn_save_img, "Save PNG")
 
     # Loop utama selama GUI dijalankan
     def run(self):
         running = True
         while running:
+            mouse_pos = pygame.mouse.get_pos()
+
             # Menangani input user
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                    self.is_solving = False
+                    self.stop_solver_flag.set()
 
                 # Cek ada mouse click atau ngga
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        mouse_pos = event.pos
-                        # Hanya bisa save kalau solusi sudah ketemu
-                        if self.found_solution:
-                            # Cek klik tombol save as image
-                            if self.btn_save_img.collidepoint(mouse_pos):
-                                timestamp = int(time.time())
-                                filename = f"../test/output/solution_{timestamp}.png"
-                                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                                
-                                # Simpan layar (tapi bagian papan aja, sisanya dicrop)
-                                sub_surface = self.screen.subsurface((0, 0, SCREEN_SIZE, SCREEN_SIZE))
-                                pygame.image.save(sub_surface, filename)
-                                print(f"Gambar disimpan: {filename}")
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    # Ketika di halaman welcome
+                    if self.grid is None:
+                        if self.btn_load_txt.collidepoint(mouse_pos):
+                            self.load_input('txt')
+                        elif self.btn_load_img.collidepoint(mouse_pos):
+                            self.load_input('img')
 
-                            # Cek klik tombol save as text
-                            if self.btn_save_txt.collidepoint(mouse_pos):
-                                timestamp = int(time.time())
-                                filename = f"../test/output/solution_{timestamp}.txt"
-                                os.makedirs(os.path.dirname(filename), exist_ok=True)
-                                
-                                if save_solution(filename, self.grid, self.current_solution):
-                                    print(f"Text disimpan: {filename}")
-                        else:
-                            # Kalau diklik tapi belum selesai solving
-                            if self.btn_save_img.collidepoint(mouse_pos) or self.btn_save_txt.collidepoint(mouse_pos):
-                                print("Tunggu pencarian selesai dulu...")
+                    # Ketika di halaman solver
+                    else:
+                        if self.btn_reset.collidepoint(mouse_pos):
+                            self.reset_state()
+
+                        if self.found_solution:
+                            # Simpan sebagai image
+                            if self.btn_save_img.collidepoint(mouse_pos):
+                                ts = int(time.time())
+                                os.makedirs("../test/output", exist_ok=True)
+                                fname = f"../test/output/solution_{ts}.png"
+
+                                # Simpan hanya foto papan
+                                x0, y0 = self.board_origin()
+                                board_px = self.cell_size * self.N
+                                sub = self.screen.subsurface((x0, y0, board_px, board_px))
+                                pygame.image.save(sub, fname)
+                                print(f"Saved PNG: {fname}")
+                            
+                            # Simpan sebagai text
+                            elif self.btn_save_txt.collidepoint(mouse_pos):
+                                ts = int(time.time())
+                                os.makedirs("../test/output", exist_ok=True)
+                                fname = f"../test/output/solution_{ts}.txt"
+                                save_solution(fname, self.grid, self.current_solution)
+                                print(f"Saved TXT: {fname}")
 
             # Gambar ulang layar
             self.screen.fill(WHITE)
-            self.draw_board()
-            self.draw_queens()
-            self.draw_info()
-            self.draw_buttons()
+            
+            # Switch tampilan berdasarkan status Grid
+            if self.grid is None:
+                self.draw_welcome_screen()
+            else:
+                self.draw_board()
+                self.draw_queens()
+                self.draw_info()
+                self.draw_buttons()
 
             # Update display
             pygame.display.flip()
@@ -258,19 +412,5 @@ class QueensGUI:
 
 # Jalankan GUI
 if __name__ == "__main__":
-    filename = "../test/input/tc1.txt" 
-    
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
-    
-    if os.path.exists(filename):
-        app = QueensGUI(filename)
-        app.run()
-    else:
-        # Coba cari relatif kalau ga ketemu
-        alt_path = os.path.join("..", "test", "input", filename)
-        if os.path.exists(alt_path):
-            app = QueensGUI(alt_path)
-            app.run()
-        else:
-            print(f"File {filename} tidak ditemukan.")
+    app = QueensGUI()
+    app.run()

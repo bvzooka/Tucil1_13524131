@@ -19,7 +19,7 @@ Dalam pengecekan validitas, dimanfaatkan list 1D yang berguna untuk menyimpan po
 Pengecekan constraints juga memanfaatkan operasi set dan aritmatika sederhana (absolut dan cek selisih).
 """
 
-def solve_queens(grid, N, visualize_callback=None):
+def solve_queens(grid, N, visualize_callback=None, should_stop=None):
     # Konfigurasi disimpan sebagai list 1D: index = baris dan value = kolom
     current_placement = [0] * N # Penanda Queen ada di baris mana dan kolom mana
     solution = []
@@ -56,6 +56,10 @@ def solve_queens(grid, N, visualize_callback=None):
     # Fungsi yang berguna untuk iterasi seluruh kemungkinan kombinasi
     def generate(row):
         nonlocal iterations
+
+        # Cek apakah harus berhenti mendadak
+        if should_stop and should_stop():
+            return False
         
         # Basis: sudah sampai baris paling bawah (papan penuh)
         if row == N:
@@ -80,6 +84,10 @@ def solve_queens(grid, N, visualize_callback=None):
         # Rekursif: coba semua kolom dari 0 sampai N-1
         for col in range(N):
             current_placement[row] = col
+
+            # Diminta berhenti atau ngga
+            if should_stop and should_stop():
+                return False
             
             # Lanjutin sampe baris bawah
             if generate(row + 1):
