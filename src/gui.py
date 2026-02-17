@@ -286,8 +286,8 @@ class QueensGUI:
             self.screen.blit(text, text.get_rect(center=(center_x, 300)))
 
         # Tombol load
-        self.draw_btn(self.btn_load_txt, "Load Text File (.txt)")
-        self.draw_btn(self.btn_load_img, "Load Image File (JPEG/JPG/PNG)")
+        self.draw_btn(self.btn_load_txt, "Load text file (.txt)")
+        self.draw_btn(self.btn_load_img, "Load image file (JPEG/JPG/PNG)")
 
     # Gambar papan dengan kotak-kotak sesuai input
     def draw_board(self):
@@ -359,8 +359,8 @@ class QueensGUI:
 
         # Save cuma muncul kalau selesai dan ada solusi
         if self.found_solution:
-            self.draw_btn(self.btn_save_txt, "Save TXT")
-            self.draw_btn(self.btn_save_img, "Save IMG")
+            self.draw_btn(self.btn_save_txt, "Save as TXT")
+            self.draw_btn(self.btn_save_img, "Save as PNG")
 
     # Loop utama selama GUI dijalankan
     def run(self):
