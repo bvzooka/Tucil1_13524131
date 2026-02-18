@@ -1,6 +1,5 @@
 # Tucil 1 - Queens LinkedIn Solver 👑
 
-> Tugas Kecil 1 Strategi Algoritma (IF2211)
 > Penyelesaian Permainan Queens LinkedIn dengan Algoritma Brute Force.
 
 ## 📌 About
@@ -74,6 +73,6 @@ python3 gui.py
 6. Apabila tidak ada solusi yang memenuhi, maka akan ditampilkan status "GAGAL" dan tombol save tidak akan muncul
 
 ## 👤 Author
-Nama Lengkap: Amanda Aurellia Salsabilla
-NIM: 13524131
+Nama Lengkap: Amanda Aurellia Salsabilla  
+NIM: 13524131  
 Kelas: K3
