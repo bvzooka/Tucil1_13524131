@@ -13,7 +13,7 @@ Tujuan permainan adalah menempatkan N buah Ratu (Queens) pada papan berukuran N 
 
 Program ini dibuat menggunakan library Tkinter untuk halaman menu dan Pygame untuk halaman solver. Program ini juga mampu melakukan input dari image untuk membaca soal langsung dari gambar.
 
-## ✨ Fitur Utama
+## ✨ Features
 * 🚀 **GUI**: Tampilan visual papan catur dan animasi pencarian solusi.
 * 📂 **Format Input**: Menerima input file teks (`.txt`) maupun gambar (`.png`, `.jpg`, `.jpeg`).
 * ⏱️ **Live Update**: Menampilkan durasi waktu eksekusi dan jumlah iterasi secara langsung.
