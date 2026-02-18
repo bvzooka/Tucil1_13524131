@@ -57,8 +57,8 @@ COLOR_MAP = {
 }
 
 # Warna Tombol
-BTN_COLOR = (70, 130, 180)
-BTN_HOVER_COLOR = (100, 149, 237)
+BTN_COLOR = (46, 139, 87)
+BTN_HOVER_COLOR = (60, 179, 113)
 TEXT_COLOR = (255, 255, 255)
 
 def get_color(char):
@@ -78,9 +78,9 @@ class QueensGUI:
         pygame.display.set_caption("Queens LinkedIn Solver")
         
         # Font
-        self.title_font = pygame.font.SysFont('Arial', 40, bold=True)
-        self.font = pygame.font.SysFont('Arial', 24)
-        self.btn_font = pygame.font.SysFont('Arial', 20, bold=True)
+        self.title_font = pygame.font.SysFont('centurygothic', 35, bold=True)
+        self.font = pygame.font.SysFont('centurygothic', 24)
+        self.btn_font = pygame.font.SysFont('centurygothic', 18, bold=True)
         
         # State variables
         self.grid = None
@@ -111,7 +111,7 @@ class QueensGUI:
             self.logo_img = pygame.transform.scale(raw_img, (120, 120))
             
         except FileNotFoundError:
-            print("WARNING: File 'crown.png' tidak ditemukan. Logo tidak akan muncul.")
+            print("ERROR: File 'crown.png' tidak ditemukan. Gagal load logo.")
 
     # Tombol di halaman menu
     def layout_menu(self):
@@ -133,13 +133,13 @@ class QueensGUI:
         pad = 16
 
         # Tombol reset
-        self.btn_reset = pygame.Rect(WINDOW_WIDTH // 2 - 70, BOARD_H + pad, 140, 40)
+        self.btn_reset = pygame.Rect(pad, pad, 140, 40)
 
         # Tombol save
         btn_w = 220
         btn_h = 46
         gap = 16
-        y_btn = BOARD_H + BOTTOM_H - pad - btn_h
+        y_btn = BOARD_H + BOTTOM_H - pad - btn_h - 40
 
         total_w = btn_w * 2 + gap
         x0 = (WINDOW_WIDTH - total_w) // 2
@@ -185,7 +185,7 @@ class QueensGUI:
                 
             # Load kalau input image
             elif input_type == 'img':
-                print(f"Loading Image dari: {path}")
+                print(f"Loading image dari: {path}")
    
                 self.grid, self.N = process_image(path)
 
@@ -320,7 +320,7 @@ class QueensGUI:
             radius = self.cell_size // 3
 
             # Gambar lingkaran Queen
-            pygame.draw.circle(self.screen, BLACK, (x, y), radius)  # outline
+            pygame.draw.circle(self.screen, BLACK, (x, y), radius)
             pygame.draw.circle(self.screen, WHITE, (x, y), radius - 2)
 
     # Menampilkan informasi interasi dan waktu
@@ -343,14 +343,14 @@ class QueensGUI:
         cx = WINDOW_WIDTH // 2
         # Status solver saat ini
         txt_st = self.font.render(status_text, True, color)
-        self.screen.blit(txt_st, txt_st.get_rect(center=(cx, info_y)))
+        self.screen.blit(txt_st, txt_st.get_rect(center=(cx, info_y + 15)))
         
         # Tampilin banyak iterasi dan waktu
         txt_iter = self.font.render(f"Iterasi: {self.iterations}", True, BLACK)
         txt_time = self.font.render(f"Waktu: {self.elapsed_time:.0f} ms", True, BLACK)
         
-        self.screen.blit(txt_iter, txt_iter.get_rect(center=(cx - 120, info_y + 30)))
-        self.screen.blit(txt_time, txt_time.get_rect(center=(cx + 120, info_y + 30)))
+        self.screen.blit(txt_iter, txt_iter.get_rect(center=(cx - 120, info_y + 55)))
+        self.screen.blit(txt_time, txt_time.get_rect(center=(cx + 120, info_y + 55)))
 
     # Tombol
     def draw_buttons(self):
